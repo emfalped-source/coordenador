@@ -12,6 +12,10 @@
 var SENHA_INICIAL = 'troque-esta-senha';
 var NOME_PLANILHA = 'Coordenador Virtual — dados';
 var DIAS_SESSAO = 365;
+// Planilha de referência dos contatos (COORDENAÇÃO 2026 RELAÇÃO ALUNOS/RESPONSÁVEIS).
+// O app lê os estudantes e telefones direto dela; basta manter essa planilha atualizada.
+var PLANILHA_REFERENCIA = '1BmHXhXhWODvIrsstNwgxRm6YBBRDjkqztzqw8wLjfJs';
+var REFERENCIA_MINUTOS = 60; // de quanto em quanto tempo o app relê a planilha de referência
 
 // ---------- instalação ----------
 function instalar() {
@@ -74,7 +78,14 @@ var API = {
   sair: function (tk) { var s = sessoes_(); delete s[hash_(String(tk), 'tk')]; gravarSessoes_(s); return true; },
   carregar: function (tk) {
     exigir_(tk);
-    return { alunos: lerAlunos_(), casos: lerCasos_() };
+    var info = null;
+    var ult = Number(PropertiesService.getScriptProperties().getProperty('REF_ULTIMA') || 0);
+    if (PLANILHA_REFERENCIA && Date.now() - ult > REFERENCIA_MINUTOS * 60000) { try { info = sincronizarReferencia_(); } catch (e) { info = { erro: String(e.message || e) }; } }
+    return { alunos: lerAlunos_(), casos: lerCasos_(), referencia: info || statusReferencia_() };
+  },
+  atualizarReferencia: function (tk) {
+    exigir_(tk);
+    return { info: sincronizarReferencia_(), alunos: lerAlunos_() };
   },
   salvarAlunos: function (tk, lista) {
     exigir_(tk);
@@ -160,3 +171,75 @@ function exigir_(tk) {
   var s = sessoes_();
   if (!tk || !s[hash_(String(tk), 'tk')]) throw new Error('SESSAO: Sessão expirada. Entre de novo.');
 }
+
+// ---------- planilha de referência ----------
+function statusReferencia_() {
+  var p = PropertiesService.getScriptProperties();
+  return { quando: Number(p.getProperty('REF_ULTIMA') || 0), total: Number(p.getProperty('REF_TOTAL') || 0) };
+}
+function norm_(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
+function tc_(s) {
+  return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().replace(/^[-\s]+|[-\s]+$/g, '').toLowerCase().split(' ')
+    .map(function (w, i) { return i && ['de', 'da', 'do', 'das', 'dos', 'e'].indexOf(w) >= 0 ? w : w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+}
+function mkId_(n) { return norm_(n).replace(/[^a-z0-9]+/g, '-').slice(0, 60); }
+function normTels_(v) {
+  var out = [];
+  String(v == null ? '' : v).split(/[,\/;?]| e | ou /i).forEach(function (p) {
+    var d = p.replace(/\D/g, '').replace(/^0+/, '');
+    if (d.indexOf('55') === 0 && d.length >= 12) d = d.slice(2);
+    if (d.length === 8 || d.length === 9) d = '31' + d;
+    if (d.length === 10 && /[6-9]/.test(d[2])) d = d.slice(0, 2) + '9' + d.slice(2);
+    var f = '(' + d.slice(0, 2) + ') ' + d.slice(2, -4) + '-' + d.slice(-4);
+    if (d.length === 11 && d[2] === '9') out.push({ tel: f, wa: true });
+    else if (d.length === 10 && /[2-5]/.test(d[2])) out.push({ tel: f, wa: false });
+  });
+  return out;
+}
+function sincronizarReferencia_() {
+  var ss = SpreadsheetApp.openById(PLANILHA_REFERENCIA);
+  var novos = [], vistos = {};
+  ss.getSheets().forEach(function (sh) {
+    var sn = sh.getName();
+    var rows = sh.getDataRange().getValues().map(function (r) { return r.map(function (c) { return typeof c === 'number' ? String(Math.round(c)) : String(c == null ? '' : c); }); });
+    var hi = -1;
+    for (var k = 0; k < rows.length && k < 15; k++) { if (rows[k].some(function (c) { return /^(aluno|estudante|nome)/.test(norm_(c)); })) { hi = k; break; } }
+    if (hi < 0) return;
+    var h = rows[hi].map(norm_);
+    var iN = -1, iT = -1, pares = [];
+    h.forEach(function (x, i) {
+      if (iN < 0 && /^(aluno|estudante|nome)/.test(x)) iN = i;
+      if (iT < 0 && /turma|classe/.test(x)) iT = i;
+      var m = x.match(/^(mae|pai|respons)/); if (m) pares.push([i, { mae: 'Mãe', pai: 'Pai', respons: 'Responsável' }[m[1]]]);
+    });
+    rows.slice(hi + 1).forEach(function (r) {
+      var nome = tc_(r[iN]);
+      var turma = iT >= 0 ? String(r[iT]).trim().toUpperCase() : '';
+      if (!turma && nome.split(' ').length >= 2) turma = String(sn).trim().toUpperCase();
+      if (!nome || !turma || /^\d+$/.test(nome)) return;
+      var cont = [];
+      pares.forEach(function (pq) {
+        var pn = r[pq[0]] && r[pq[0]] !== '0' ? tc_(r[pq[0]]) : ''; if (pn === '-') pn = '';
+        normTels_(r[pq[0] + 1]).forEach(function (t) { cont.push({ q: pq[1], nome: pn, tel: t.tel, wa: t.wa }); });
+      });
+      var id = mkId_(nome); if (vistos[id]) id += '-' + mkId_(turma); vistos[id] = 1;
+      var c0 = cont.filter(function (c) { return c.nome; })[0];
+      novos.push({ id: id, nome: nome, turma: turma, resp: c0 ? c0.q + ': ' + c0.nome : '', cont: cont });
+    });
+  });
+  if (!novos.length) throw new Error('A planilha de referência não tem estudantes legíveis.');
+  novos.sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt'); });
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh2 = aba_('Contatos');
+    var trat = {}; lerAlunos_().forEach(function (a) { if (a.g) trat[a.id] = a.g; });
+    if (sh2.getLastRow() > 1) sh2.getRange(2, 1, sh2.getLastRow() - 1, 6).clearContent();
+    var linhas = novos.map(function (a) { return linhaAluno_(a, trat[a.id] || ''); });
+    sh2.getRange(2, 1, linhas.length, 6).setValues(linhas);
+  } finally { lock.releaseLock(); }
+  var p = PropertiesService.getScriptProperties();
+  p.setProperty('REF_ULTIMA', String(Date.now())); p.setProperty('REF_TOTAL', String(novos.length));
+  return { quando: Date.now(), total: novos.length, comWhats: novos.filter(function (a) { return a.cont.some(function (c) { return c.wa; }); }).length };
+}
+// Rode no editor para testar a leitura da planilha de referência.
+function testarReferencia() { Logger.log(JSON.stringify(sincronizarReferencia_())); }
