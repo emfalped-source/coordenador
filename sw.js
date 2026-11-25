@@ -1,5 +1,5 @@
 // Guarda só a casca do app para abrir mais rápido. Os dados vêm sempre do servidor.
-var CACHE = 'coordenador-v2';
+var CACHE = 'coordenador-v3';
 var CASCA = ['./', 'index.html', 'manifest.webmanifest', 'icone-192.png', 'icone-512.png'];
 self.addEventListener('install', function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(CASCA); })); self.skipWaiting(); });
 self.addEventListener('activate', function (e) {

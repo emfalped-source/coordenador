@@ -119,8 +119,12 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{text-align:left;p
 <section id="v-cont" hidden>
  <div class="card">
   <h2>Planilha de telefones</h2>
-  <p class="mut">Importe a planilha (.xlsx ou .csv) com colunas de nome do estudante, turma, responsável e telefone/WhatsApp. A importação substitui a lista anterior na sua planilha do Google; o histórico de casos é mantido.</p>
-  <input type="file" id="arq" accept=".xlsx,.xls,.csv" aria-label="Arquivo da planilha">
+  <p class="mut">Os estudantes e telefones vêm direto da planilha <b>COORDENAÇÃO 2026 RELAÇÃO ALUNOS/RESPONSÁVEIS</b>, no Google Drive. Para corrigir um telefone, corrija lá: o app relê a planilha sozinho a cada hora. O histórico de casos é mantido.</p>
+  <div class="row"><button class="btn alt" type="button" id="refBtn">Atualizar agora</button></div>
+  <div id="refinfo" class="mut" style="margin-top:8px"></div>
+  <details style="margin-top:10px"><summary class="mut">Importar outra planilha (.xlsx) uma vez</summary>
+  <p class="mut">Substitui a lista até a próxima atualização automática.</p>
+  <input type="file" id="arq" accept=".xlsx,.xls,.csv" aria-label="Arquivo da planilha"></details>
   <div id="impinfo" class="mut" style="margin-top:8px"></div>
  </div>
  <div class="card">
@@ -163,9 +167,15 @@ async function apagarCaso(id){casos=casos.filter(c=>c.id!==id);gravarLocal();ren
 function tela(t){$('#v-login').hidden=t!=='login';$('#tabs').hidden=t==='login';if(t==='login'){['caso','hist','cont'].forEach(x=>$('#v-'+x).hidden=true)}else{document.querySelector('#tabs button.on').click()}}
 function sairLocal(){SESS=null;lsS(SK,null);lsS(LK,null);alunos=[];casos=[];tela('login');$('#nuvem').textContent='Conecte-se para usar'}
 async function sincronizar(){const st=$('#nuvem');st.textContent='Atualizando…';
- try{const d=await comToken('carregar');alunos=d.alunos||[];casos=d.casos||[];gravarLocal();st.innerHTML='Salvo na sua planilha do Google · <button id="sair" style="background:none;border:0;color:#fff;text-decoration:underline;font:inherit;cursor:pointer;padding:0">sair</button>';$('#sair').onclick=()=>{comToken('sair').catch(()=>{});sairLocal()}}
+ try{const d=await comToken('carregar');alunos=d.alunos||[];casos=d.casos||[];gravarLocal();refInfo(d.referencia);st.innerHTML='Salvo na sua planilha do Google · <button id="sair" style="background:none;border:0;color:#fff;text-decoration:underline;font:inherit;cursor:pointer;padding:0">sair</button>';$('#sair').onclick=()=>{comToken('sair').catch(()=>{});sairLocal()}}
  catch(e){st.textContent=SESS?'Sem conexão: mostrando a última cópia deste aparelho':'Conecte-se para usar'}
  renderCont();renderHist();renderSel();if(st0.aid)analisar()}
+function refInfo(r){const el=$('#refinfo');if(!el||!r)return;if(r.erro){el.textContent='Não consegui ler a planilha de referência: '+r.erro;return}
+ if(!r.quando){el.textContent='Ainda não li a planilha de referência.';return}
+ el.textContent=`Última leitura: ${new Date(r.quando).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})} · ${r.total} estudantes`+(r.comWhats!=null?`, ${r.comWhats} com WhatsApp`:'')}
+$('#refBtn').onclick=async()=>{const b=$('#refBtn');b.disabled=true;b.textContent='Lendo a planilha…';
+ try{const d=await comToken('atualizarReferencia');alunos=d.alunos||[];gravarLocal();refInfo(d.info);renderCont();toast('Contatos atualizados')}catch(e){$('#refinfo').textContent='Erro: '+e.message}
+ b.disabled=false;b.textContent='Atualizar agora'};
 $('#urlBox').hidden=!!API_PADRAO;$('#lUrl').value=API;
 $('#fLogin').onsubmit=async e=>{e.preventDefault();const er=$('#lErro');er.hidden=true;
  if(!API_PADRAO){API=$('#lUrl').value.trim();if(!/^https:\/\/script\.google\.com\/.+\/exec$/.test(API)){er.textContent='Cole o endereço do Apps Script que termina em /exec.';er.hidden=false;return}lsS(UK,API)}
