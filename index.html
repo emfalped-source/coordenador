@@ -92,7 +92,7 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{text-align:left;p
 <main>
 <section id="v-login" hidden><div class="card" style="max-width:440px;margin:24px auto">
  <h2>Entrar</h2>
- <p class="mut">Uso pessoal da coordenação. Os dados ficam na sua planilha do Google Drive.</p>
+ <p class="mut">Uso pessoal da coordenação. Os dados ficam na sua planilha do Google Drive. No primeiro acesso, a senha que você digitar (mínimo 6 caracteres) passa a ser a sua senha.</p>
  <form id="fLogin">
   <div id="urlBox"><label for="lUrl">Endereço do servidor (Apps Script, termina em /exec)</label><input id="lUrl" inputmode="url" autocomplete="off"></div>
   <label for="lSen">Senha</label><input id="lSen" type="password" autocomplete="current-password">
@@ -142,7 +142,7 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const norm=s=>String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
 const toast=t=>{const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),2400)};
 const LK='coordVirtual.v1',SK='coordVirtual.sessao',UK='coordVirtual.api';
-const API_PADRAO='';// endereço /exec do Apps Script (preenchido na implantação)
+const API_PADRAO='https://script.google.com/macros/s/AKfycbxiqZ0qzn-rYmk3FE5kOougXpFPCGowiZadKeAPIsH8OIX9l6G5P3cv6xcLp3ZrTnMzNQ/exec';// endereço /exec do Apps Script (preenchido na implantação)
 let alunos=[],casos=[];
 const lsG=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsS=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}};
 let API=API_PADRAO||lsG(UK)||'',SESS=null;try{SESS=JSON.parse(lsG(SK)||'null')}catch(e){}
