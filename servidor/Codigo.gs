@@ -3,13 +3,11 @@
  * Uso pessoal do coordenador. Os dados ficam numa planilha no Drive da conta que publica este script.
  *
  * Instalação (uma vez):
- * 1. Rode a função "instalar" e autorize quando o Google pedir.
- *    Ela cria a planilha "Coordenador Virtual — dados" no seu Drive.
- * 2. Na linha SENHA_INICIAL abaixo, troque o texto pela senha que você quer usar e rode "definirSenha".
- *    Depois volte a linha para 'troque-esta-senha' e salve: a senha fica guardada só como código embaralhado
- *    (hash) nas propriedades do script, nunca no código.
- * 3. Implantar > Nova implantação > App da Web: Executar como "Eu"; Quem pode acessar "Qualquer pessoa".
+ * 1. Implantar > Nova implantação > App da Web: Executar como "Eu"; Quem pode acessar "Qualquer pessoa".
  *    Copie o endereço que termina em /exec.
+ * 2. No primeiro acesso pelo app, a senha digitada vira a senha do app (guardada só como hash).
+ *    A planilha "Coordenador Virtual — dados" é criada sozinha no seu Drive.
+ *    Para trocar a senha depois: troque SENHA_INICIAL e rode "definirSenha".
  */
 var SENHA_INICIAL = 'troque-esta-senha';
 var NOME_PLANILHA = 'Coordenador Virtual — dados';
@@ -59,7 +57,14 @@ var API = {
   entrar: function (senha) {
     var p = PropertiesService.getScriptProperties();
     Utilities.sleep(400); // freia tentativas em série
-    if (!p.getProperty('SENHA')) throw new Error('Servidor sem senha definida. Rode "definirSenha" no Apps Script.');
+    if (!p.getProperty('PLANILHA')) instalar();
+    if (!p.getProperty('SENHA')) {
+      // primeiro acesso: a senha digitada passa a ser a senha do app
+      if (String(senha || '').length < 6) throw new Error('Primeiro acesso: crie uma senha com pelo menos 6 caracteres.');
+      var sal = Utilities.getUuid();
+      p.setProperty('SAL', sal);
+      p.setProperty('SENHA', hash_(String(senha), sal));
+    }
     if (hash_(String(senha || ''), p.getProperty('SAL')) !== p.getProperty('SENHA')) throw new Error('Senha incorreta.');
     var tk = Utilities.getUuid() + Utilities.getUuid().slice(0, 8);
     var s = sessoes_(); s[hash_(tk, 'tk')] = Date.now() + DIAS_SESSAO * 864e5;
