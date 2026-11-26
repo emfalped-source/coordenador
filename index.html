@@ -81,6 +81,7 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{text-align:left;p
 .scroll{overflow-x:auto}
 @media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:6.5em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:6em;margin-inline-start:-6.5em;color:var(--mut)}.stack td:empty{display:none}}
 @media(prefers-reduced-motion:reduce){.toast{transition:none}}
+.obs{display:inline-block;margin-top:4px;font-size:.85em;color:var(--ter,#b5532f);font-weight:600}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -271,7 +272,7 @@ $('#busca').oninput=()=>{const q=norm($('#busca').value);if(!q){$('#sug').innerH
  const r=alunos.filter(a=>norm(a.nome+' '+a.turma+' '+nomeTurma(a.turma)).includes(q)).slice(0,8);
  $('#sug').innerHTML=r.length?`<div class="sug">${r.map(a=>`<button data-id="${esc(a.id)}">${esc(a.nome)} <span class="mut">· ${esc(nomeTurma(a.turma))}</span></button>`).join('')}</div>`:`<p class="mut">${alunos.length?'Ninguém encontrado.':'Nenhum estudante cadastrado.'} Cadastre na aba Contatos.</p>`;
  ligaBotoes($('#sug'))};
-function renderSel(){const a=aluno();$('#buscaBox').hidden=!!a;renderLista();$('#selAluno').innerHTML=a?`<div class="sel"><div><b>${esc(a.nome)}</b>${a.turma?" · "+esc(nomeTurma(a.turma)):""}<br><span class="mut">${contatos(a).length?contatos(a).map(c=>esc(c.q+(c.nome?' '+primeiro(c.nome):'')+': '+c.tel)).join(' · '):'sem telefone cadastrado'}</span></div><button id="trocar">Trocar</button></div>`:'';
+function renderSel(){const a=aluno();$('#buscaBox').hidden=!!a;renderLista();$('#selAluno').innerHTML=a?`<div class="sel"><div><b>${esc(a.nome)}</b>${a.turma?" · "+esc(nomeTurma(a.turma)):""}<br><span class="mut">${contatos(a).length?contatos(a).map(c=>esc(c.q+(c.nome?' '+primeiro(c.nome):'')+': '+c.tel)).join(' · '):'sem telefone cadastrado'}</span>${a.obs?`<br><span class="obs">Obs.: ${esc(a.obs)}</span>`:''}</div><button id="trocar">Trocar</button></div>`:'';
  if(a)$('#trocar').onclick=()=>{st0.aid=null;renderSel();analisar();if(!st0.turma)$('#busca').focus()}}
 // ---------- situação ----------
 function renderCats(){$('#cats').innerHTML=Object.entries(R).map(([k,v])=>`<button class="chip${st0.cat===k?' on':''}" data-k="${k}">${v.nome}</button>`).join('');
@@ -362,7 +363,7 @@ function renderHist(){const q=norm($('#hbusca').value);const l=casos.filter(c=>!
 $('#hbusca').oninput=renderHist;
 // ---------- contatos ----------
 function renderCont(){const q=norm($('#cbusca').value);const l=alunos.filter(a=>!q||norm(a.nome+' '+a.turma).includes(q));
- $('#clist').innerHTML=`<p class="mut">${alunos.length} estudante(s), ${alunos.filter(a=>contatos(a).some(c=>c.wa)).length} com WhatsApp</p>`+(l.length?`<table class="stack"><thead><tr><th>Estudante</th><th>Turma</th><th>Responsável</th><th>Telefone</th><th></th></tr></thead><tbody>${l.slice(0,200).map(a=>`<tr><td>${esc(a.nome)}</td><td>${esc(a.turma)}</td><td>${contatos(a).map(c=>esc(c.q+(c.nome?': '+c.nome:''))).join('<br>')}</td><td>${contatos(a).map(c=>esc(c.tel)).join('<br>')}</td><td><button class="del" data-ed="${esc(a.id)}" style="color:var(--pet)">Editar</button></td></tr>`).join('')}</tbody></table>${l.length>200?'<p class="mut">Mostrando 200. Use o filtro.</p>':''}`:'<div class="empty">Importe a planilha ou cadastre acima.</div>');
+ $('#clist').innerHTML=`<p class="mut">${alunos.length} estudante(s), ${alunos.filter(a=>contatos(a).some(c=>c.wa)).length} com WhatsApp</p>`+(l.length?`<table class="stack"><thead><tr><th>Estudante</th><th>Turma</th><th>Responsável</th><th>Telefone</th><th></th></tr></thead><tbody>${l.slice(0,200).map(a=>`<tr><td>${esc(a.nome)}${a.obs?`<br><span class="obs">Obs.: ${esc(a.obs)}</span>`:''}</td><td>${esc(a.turma)}</td><td>${contatos(a).map(c=>esc(c.q+(c.nome?': '+c.nome:''))).join('<br>')}</td><td>${contatos(a).map(c=>esc(c.tel)).join('<br>')}</td><td><button class="del" data-ed="${esc(a.id)}" style="color:var(--pet)">Editar</button></td></tr>`).join('')}</tbody></table>${l.length>200?'<p class="mut">Mostrando 200. Use o filtro.</p>':''}`:'<div class="empty">Importe a planilha ou cadastre acima.</div>');
  $('#clist').querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{const a=alunos.find(x=>x.id===b.dataset.ed);$('#nNome').value=a.nome;$('#nTurma').value=a.turma;{const c0=contatos(a)[0];$('#nResp').value=c0?(c0.q!=='Responsável'?c0.q+': ':'')+c0.nome:'';$('#nTel').value=contatos(a).map(c=>c.tel).join(' / ')}$('#nNome').scrollIntoView({block:'center'})})}
 $('#cbusca').oninput=renderCont;
 const normTels=v=>{const out=[];for(const p of String(v??'').split(/[,\/;?]| e | ou /i)){let d=p.replace(/\D/g,'').replace(/^0+/,'');if(d.startsWith('55')&&d.length>=12)d=d.slice(2);if(d.length===8||d.length===9)d='31'+d;if(d.length===10&&/[6-9]/.test(d[2]))d=d.slice(0,2)+'9'+d.slice(2);const f=`(${d.slice(0,2)}) ${d.slice(2,-4)}-${d.slice(-4)}`;if(d.length===11&&d[2]==='9')out.push({tel:f,wa:true});else if(d.length===10&&/[2-5]/.test(d[2]))out.push({tel:f,wa:false})}return out};
@@ -371,22 +372,102 @@ const separaTels=s=>[...new Set(String(s).split(/[\/;,]| e /).map(t=>t.trim()).f
 const mkId=n=>norm(n).replace(/[^a-z0-9]+/g,'-').slice(0,60);
 $('#nSalvar').onclick=async()=>{const nome=$('#nNome').value.trim();if(!nome){toast('Informe o nome');return}
  const rs=$('#nResp').value.trim(),qm=rs.match(/^(m[ãa]e|pai)\s*:?\s*/i);const ts=normTels($('#nTel').value);const novo={id:mkId(nome),nome,turma:$('#nTurma').value.trim(),resp:rs,cont:ts.map(t=>({q:qm?(/^p/i.test(qm[1])?'Pai':'Mãe'):'Responsável',nome:qm?rs.slice(qm[0].length):rs,tel:t.tel,wa:t.wa})),tels:ts.map(t=>t.tel)};
- const i=alunos.findIndex(a=>norm(a.nome)===norm(nome));if(i>=0){novo.id=alunos[i].id;if(alunos[i].g)novo.g=alunos[i].g;alunos[i]=novo}else alunos.push(novo);
+ const i=alunos.findIndex(a=>norm(a.nome)===norm(nome));if(i>=0){novo.id=alunos[i].id;if(alunos[i].g)novo.g=alunos[i].g;if(alunos[i].obs)novo.obs=alunos[i].obs;alunos[i]=novo}else alunos.push(novo);
  alunos.sort((x,y)=>x.nome.localeCompare(y.nome,'pt'));await salvarAluno(novo);renderTurmas();['nNome','nTurma','nResp','nTel'].forEach(k=>$('#'+k).value='');renderCont();toast(i>=0?'Estudante atualizado':'Estudante cadastrado')};
+// leitor da planilha de referência (mesma lógica do servidor/Codigo.gs)
+const lerAbaRef=(()=>{function norm_(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
+function tc_(s) {
+  return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().replace(/^[-\s]+|[-\s]+$/g, '').toLowerCase().split(' ')
+    .map(function (w, i) { return i && ['de', 'da', 'do', 'das', 'dos', 'e'].indexOf(w) >= 0 ? w : w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+}
+function mkId_(n) { return norm_(n).replace(/[^a-z0-9]+/g, '-').slice(0, 60); }
+function normTels_(v) {
+  var out = [];
+  String(v == null ? '' : v).split(/[,\/;?]| e | ou /i).forEach(function (p) {
+    var d = p.replace(/\D/g, '').replace(/^0+/, '');
+    if (d.indexOf('55') === 0 && d.length >= 12) d = d.slice(2);
+    if (d.length === 8 || d.length === 9) d = '31' + d;
+    if (d.length === 10 && /[6-9]/.test(d[2])) d = d.slice(0, 2) + '9' + d.slice(2);
+    var f = '(' + d.slice(0, 2) + ') ' + d.slice(2, -4) + '-' + d.slice(-4);
+    if (d.length === 11 && d[2] === '9') out.push({ tel: f, wa: true });
+    else if (d.length === 10 && /[2-5]/.test(d[2])) out.push({ tel: f, wa: false });
+  });
+  return out;
+}
+// Separa os telefones que estão no meio de um texto (ex.: "AVÓ - MARIA (31) 98206-9304").
+var RE_TEL_ = /(?:\+?55\s*)?(?:\(?\d{2}\)?[\s.-]*)?9?\d{4}[\s.-]?\d{4}/g;
+function tirarTels_(txt) {
+  var t = String(txt == null ? '' : txt), tels = [];
+  t = t.replace(RE_TEL_, function (m) { normTels_(m).forEach(function (x) { tels.push(x); }); return ' '; });
+  return { resto: t.replace(/\s+/g, ' ').trim(), tels: tels };
+}
+// Nome do responsável com prefixo ("RESP. LEGAL - TIA - DEBORA...") -> { q: 'Tia', nome: 'Debora...' }
+var PARENTES_ = { 'avo': 'Avó', 'avó': 'Avó', 'avô': 'Avô', 'tio': 'Tio', 'tia': 'Tia', 'irma': 'Irmã', 'irmã': 'Irmã', 'irmao': 'Irmão', 'irmão': 'Irmão', 'madrinha': 'Madrinha', 'padrinho': 'Padrinho', 'madrasta': 'Madrasta', 'padrasto': 'Padrasto' };
+function pessoa_(txt, qPadrao) {
+  var t = String(txt == null ? '' : txt).replace(/\s+/g, ' ').trim(), q = qPadrao, achou = true;
+  while (achou) {
+    achou = false;
+    var m = t.match(/^(resp(?:ons[aá]vel)?\.?(?:\s+legal)?|legal)\s*[-:]?\s*/i);
+    if (m && m[0]) { if (q === qPadrao) q = 'Responsável legal'; t = t.slice(m[0].length); achou = true; continue; }
+    m = t.match(/^([a-zà-ú]+)\s*[-:]\s*|^([a-zà-ú]+)\s+(?=[-:])/i);
+    var w = m && String(m[1] || m[2]).toLowerCase();
+    if (w && PARENTES_[w]) { q = PARENTES_[w]; t = t.slice(m[0].length).replace(/^[-:\s]+/, ''); achou = true; }
+  }
+  var nome = tc_(t); if (nome === '-' || nome === '0') nome = '';
+  return { q: q, nome: nome };
+}
+// Observação com contato ("ALOJADO NO CRUZEIRO - KATIANE (38) 99820-8611") -> contatos extras.
+function contatosObs_(txt) {
+  var x = tirarTels_(txt); if (!x.tels.length) return [];
+  var partes = x.resto.split(/\s+[-–:]\s*|:\s*/).map(function (p) { return p.trim(); }).filter(String);
+  var q = partes.length ? tc_(partes[0]) : 'Observação', nome = partes.length > 1 ? tc_(partes[partes.length - 1]) : '';
+  var al = norm_(q).match(/^alojad[oa]s?(?:\s+n[oa])?\s+(.+)$/);
+  if (al) q = 'Alojamento ' + tc_(al[1]).replace(/^America\b/, 'América');
+  return x.tels.map(function (t) { return { q: q, nome: nome, tel: t.tel, wa: t.wa, obs: true }; });
+}
+// Lê uma aba da planilha de referência (linhas já convertidas em texto).
+function lerAbaRef_(rows, sn, vistos) {
+  var out = [], hi = -1;
+  for (var k = 0; k < rows.length && k < 15; k++) { if (rows[k].some(function (c) { return /^(aluno|estudante|nome)/.test(norm_(c)); })) { hi = k; break; } }
+  if (hi < 0) return out;
+  var h = rows[hi].map(norm_);
+  var iN = -1, iT = -1, pares = [], usadas = {};
+  h.forEach(function (x, i) {
+    if (iN < 0 && /^(aluno|estudante|nome)/.test(x)) iN = i;
+    if (iT < 0 && /turma|classe/.test(x)) iT = i;
+    var m = x.match(/^(mae|pai|respons)/); if (m) pares.push([i, { mae: 'Mãe', pai: 'Pai', respons: 'Responsável' }[m[1]]]);
+  });
+  usadas[iN] = usadas[iT] = 1; pares.forEach(function (pq) { usadas[pq[0]] = usadas[pq[0] + 1] = 1; });
+  // Colunas de observação: as que vêm depois do último telefone (com ou sem título).
+  var ultima = Math.max.apply(null, [iN, iT].concat(pares.map(function (pq) { return pq[0] + 1; })));
+  rows.slice(hi + 1).forEach(function (r) {
+    var cru = String(r[iN] == null ? '' : r[iN]);
+    var nome = tc_(cru.replace(/^[^A-Za-zÀ-ú]+/, ''));
+    var turma = iT >= 0 ? String(r[iT]).trim().toUpperCase() : '';
+    if (!turma && nome.split(' ').length >= 2) turma = String(sn).trim().toUpperCase();
+    if (!nome || !turma || /^\d+$/.test(nome)) return;
+    var cont = [], vistosTel = {};
+    var add = function (c) { var k = c.q + '|' + c.nome + '|' + c.tel; if (vistosTel[k]) return; vistosTel[k] = 1; cont.push(c); };
+    var obs = [];
+    for (var j = ultima + 1; j < r.length; j++) { if (!usadas[j] && String(r[j]).trim()) obs.push(String(r[j]).replace(/\s+/g, ' ').trim()); }
+    // A observação vem primeiro: quando existe, é o contato que a escola indicou (ex.: alojamento do clube).
+    obs.forEach(function (o) { contatosObs_(o).forEach(add); });
+    pares.forEach(function (pq) {
+      var x = tirarTels_(r[pq[0]]), ps = pessoa_(x.resto, pq[1]);
+      x.tels.concat(normTels_(r[pq[0] + 1])).forEach(function (t) { add({ q: ps.q, nome: ps.nome, tel: t.tel, wa: t.wa }); });
+    });
+    var id = mkId_(cru.trim() ? tc_(cru) : nome); if (vistos[id]) id += '-' + mkId_(turma); vistos[id] = 1;
+    var c0 = cont.filter(function (c) { return c.nome; })[0];
+    out.push({ id: id, nome: nome, turma: turma, resp: c0 ? c0.q + ': ' + c0.nome : '', cont: cont, obs: obs.join(' · ') });
+  });
+  return out;
+}
+return lerAbaRef_})();
 $('#arq').onchange=e=>{const f=e.target.files[0];if(!f)return;if(typeof XLSX==='undefined'){$('#impinfo').textContent='Não consegui carregar o leitor de planilhas. Verifique a internet e tente de novo.';return}
  $('#impinfo').textContent='Lendo a planilha…';
- const rd=new FileReader();rd.onload=async()=>{try{const wb=XLSX.read(rd.result,{type:'array'});const novos=[],vistos=new Set();
-  wb.SheetNames.forEach(sn=>{const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''});
-   const hi=rows.findIndex(r=>r.some(c=>/^(aluno|estudante|nome)/.test(norm(c))));if(hi<0)return;const h=rows[hi].map(norm);
-   const iN=h.findIndex(x=>/^(aluno|estudante|nome)/.test(x)),iT=h.findIndex(x=>/turma|classe/.test(x));
-   const pares=[];h.forEach((x,i)=>{const m=x.match(/^(mae|pai|respons)/);if(m)pares.push([i,{mae:'Mãe',pai:'Pai',respons:'Responsável'}[m[1]]])});
-   const soTel=!pares.length?h.map((x,i)=>/tel|cel|whats|fone|contato/.test(x)?i:-1).filter(i=>i>=0):[];
-   rows.slice(hi+1).forEach(r=>{const nome=tc(r[iN]);let turma=iT>=0?String(r[iT]).trim().toUpperCase():'';
-    if(!turma&&nome.split(' ').length>=2)turma=String(sn).trim().toUpperCase();if(!nome||!turma||/^\d+$/.test(nome))return;
-    const cont=[];pares.forEach(([i,q])=>{let pn=r[i]&&r[i]!=='0'&&r[i]!==0?tc(r[i]):'';if(pn==='-')pn='';normTels(r[i+1]).forEach(t=>cont.push({q,nome:pn,tel:t.tel,wa:t.wa}))});
-    soTel.forEach(i=>normTels(r[i]).forEach(t=>cont.push({q:'Responsável',nome:'',tel:t.tel,wa:t.wa})));
-    let id=mkId(nome);if(vistos.has(id))id+='-'+mkId(turma);vistos.add(id);
-    const c0=cont.find(c=>c.nome);novos.push({id,nome,turma,resp:c0?c0.q+': '+c0.nome:'',cont,tels:cont.map(c=>c.tel)})})});
+ const rd=new FileReader();rd.onload=async()=>{try{const wb=XLSX.read(rd.result,{type:'array'});const novos=[];
+  const vistos={};wb.SheetNames.forEach(sn=>{const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''}).map(r=>r.map(c=>typeof c==='number'?String(Math.round(c)):String(c??'')));
+   lerAbaRef(rows,sn,vistos).forEach(a=>{a.tels=a.cont.map(c=>c.tel);novos.push(a)})});
   if(!novos.length){$('#impinfo').textContent='Não achei uma coluna com o nome dos estudantes. Confira se a planilha tem cabeçalho (Nome, Turma, Responsável, Telefone).';return}
   alunos=novos.sort((x,y)=>x.nome.localeCompare(y.nome,'pt'));await salvarAlunos();renderCont();renderTurmas();$('#impinfo').textContent=`Importados ${novos.length} estudantes, ${novos.filter(a=>a.cont.some(c=>c.wa)).length} com WhatsApp.`}catch(err){$('#impinfo').textContent='Erro ao ler a planilha: '+err.message}};rd.readAsArrayBuffer(f)};
 renderCats();renderTurmas();renderSel();renderCont();renderHist();

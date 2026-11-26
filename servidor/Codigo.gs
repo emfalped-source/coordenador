@@ -24,7 +24,7 @@ function instalar() {
   if (id) { try { SpreadsheetApp.openById(id); Logger.log('Já instalado: ' + SpreadsheetApp.openById(id).getUrl()); return; } catch (e) {} }
   var ss = SpreadsheetApp.create(NOME_PLANILHA);
   var c = ss.getSheets()[0]; c.setName('Contatos');
-  c.getRange(1, 1, 1, 6).setValues([['id', 'nome', 'turma', 'responsavel', 'contatos', 'tratamento']]);
+  c.getRange(1, 1, 1, 7).setValues([['id', 'nome', 'turma', 'responsavel', 'contatos', 'tratamento', 'observacao']]);
   var k = ss.insertSheet('Casos');
   k.getRange(1, 1, 1, 13).setValues([['id', 'data', 'estudante_id', 'estudante', 'turma', 'tipo', 'situacao', 'nivel', 'canal', 'decisao', 'detalhes', 'mensagem', 'registrado_em']]);
   [c, k].forEach(function (s) { s.setFrozenRows(1); s.getRange('1:1').setFontWeight('bold'); });
@@ -93,9 +93,9 @@ var API = {
     try {
       var sh = aba_('Contatos');
       var trat = {}; lerAlunos_().forEach(function (a) { if (a.g) trat[a.id] = a.g; });
-      if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 6).clearContent();
+      if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 7).clearContent();
       var rows = (lista || []).map(function (a) { return linhaAluno_(a, a.g || trat[a.id] || ''); });
-      if (rows.length) sh.getRange(2, 1, rows.length, 6).setValues(rows);
+      if (rows.length) sh.getRange(2, 1, rows.length, 7).setValues(rows);
       return rows.length;
     } finally { lock.releaseLock(); }
   },
@@ -104,7 +104,7 @@ var API = {
     var lock = LockService.getScriptLock(); lock.waitLock(20000);
     try {
       var sh = aba_('Contatos'), r = acharLinha_(sh, a.id), row = [linhaAluno_(a, a.g || '')];
-      if (r) sh.getRange(r, 1, 1, 6).setValues(row); else sh.appendRow(row[0]);
+      if (r) sh.getRange(r, 1, 1, 7).setValues(row); else sh.appendRow(row[0]);
       return true;
     } finally { lock.releaseLock(); }
   },
@@ -130,15 +130,16 @@ function planilha_() {
 }
 function aba_(n) { return planilha_().getSheetByName(n); }
 function linhaAluno_(a, g) {
-  return [String(a.id), String(a.nome || ''), String(a.turma || ''), String(a.resp || ''), JSON.stringify(a.cont || []), g || ''];
+  return [String(a.id), String(a.nome || ''), String(a.turma || ''), String(a.resp || ''), JSON.stringify(a.cont || []), g || '', String(a.obs || '')];
 }
 function lerAlunos_() {
   var sh = aba_('Contatos'), n = sh.getLastRow() - 1;
   if (n < 1) return [];
-  return sh.getRange(2, 1, n, 6).getValues().filter(function (r) { return r[0]; }).map(function (r) {
+  return sh.getRange(2, 1, n, 7).getValues().filter(function (r) { return r[0]; }).map(function (r) {
     var cont = []; try { cont = JSON.parse(r[4] || '[]'); } catch (e) {}
     var a = { id: String(r[0]), nome: r[1], turma: r[2], resp: r[3], cont: cont, tels: cont.map(function (c) { return c.tel; }) };
     if (r[5]) a.g = r[5];
+    if (r[6]) a.obs = String(r[6]);
     return a;
   });
 }
@@ -196,36 +197,80 @@ function normTels_(v) {
   });
   return out;
 }
+// Separa os telefones que estão no meio de um texto (ex.: "AVÓ - MARIA (31) 98206-9304").
+var RE_TEL_ = /(?:\+?55\s*)?(?:\(?\d{2}\)?[\s.-]*)?9?\d{4}[\s.-]?\d{4}/g;
+function tirarTels_(txt) {
+  var t = String(txt == null ? '' : txt), tels = [];
+  t = t.replace(RE_TEL_, function (m) { normTels_(m).forEach(function (x) { tels.push(x); }); return ' '; });
+  return { resto: t.replace(/\s+/g, ' ').trim(), tels: tels };
+}
+// Nome do responsável com prefixo ("RESP. LEGAL - TIA - DEBORA...") -> { q: 'Tia', nome: 'Debora...' }
+var PARENTES_ = { 'avo': 'Avó', 'avó': 'Avó', 'avô': 'Avô', 'tio': 'Tio', 'tia': 'Tia', 'irma': 'Irmã', 'irmã': 'Irmã', 'irmao': 'Irmão', 'irmão': 'Irmão', 'madrinha': 'Madrinha', 'padrinho': 'Padrinho', 'madrasta': 'Madrasta', 'padrasto': 'Padrasto' };
+function pessoa_(txt, qPadrao) {
+  var t = String(txt == null ? '' : txt).replace(/\s+/g, ' ').trim(), q = qPadrao, achou = true;
+  while (achou) {
+    achou = false;
+    var m = t.match(/^(resp(?:ons[aá]vel)?\.?(?:\s+legal)?|legal)\s*[-:]?\s*/i);
+    if (m && m[0]) { if (q === qPadrao) q = 'Responsável legal'; t = t.slice(m[0].length); achou = true; continue; }
+    m = t.match(/^([a-zà-ú]+)\s*[-:]\s*|^([a-zà-ú]+)\s+(?=[-:])/i);
+    var w = m && String(m[1] || m[2]).toLowerCase();
+    if (w && PARENTES_[w]) { q = PARENTES_[w]; t = t.slice(m[0].length).replace(/^[-:\s]+/, ''); achou = true; }
+  }
+  var nome = tc_(t); if (nome === '-' || nome === '0') nome = '';
+  return { q: q, nome: nome };
+}
+// Observação com contato ("ALOJADO NO CRUZEIRO - KATIANE (38) 99820-8611") -> contatos extras.
+function contatosObs_(txt) {
+  var x = tirarTels_(txt); if (!x.tels.length) return [];
+  var partes = x.resto.split(/\s+[-–:]\s*|:\s*/).map(function (p) { return p.trim(); }).filter(String);
+  var q = partes.length ? tc_(partes[0]) : 'Observação', nome = partes.length > 1 ? tc_(partes[partes.length - 1]) : '';
+  var al = norm_(q).match(/^alojad[oa]s?(?:\s+n[oa])?\s+(.+)$/);
+  if (al) q = 'Alojamento ' + tc_(al[1]).replace(/^America\b/, 'América');
+  return x.tels.map(function (t) { return { q: q, nome: nome, tel: t.tel, wa: t.wa, obs: true }; });
+}
+// Lê uma aba da planilha de referência (linhas já convertidas em texto).
+function lerAbaRef_(rows, sn, vistos) {
+  var out = [], hi = -1;
+  for (var k = 0; k < rows.length && k < 15; k++) { if (rows[k].some(function (c) { return /^(aluno|estudante|nome)/.test(norm_(c)); })) { hi = k; break; } }
+  if (hi < 0) return out;
+  var h = rows[hi].map(norm_);
+  var iN = -1, iT = -1, pares = [], usadas = {};
+  h.forEach(function (x, i) {
+    if (iN < 0 && /^(aluno|estudante|nome)/.test(x)) iN = i;
+    if (iT < 0 && /turma|classe/.test(x)) iT = i;
+    var m = x.match(/^(mae|pai|respons)/); if (m) pares.push([i, { mae: 'Mãe', pai: 'Pai', respons: 'Responsável' }[m[1]]]);
+  });
+  usadas[iN] = usadas[iT] = 1; pares.forEach(function (pq) { usadas[pq[0]] = usadas[pq[0] + 1] = 1; });
+  // Colunas de observação: as que vêm depois do último telefone (com ou sem título).
+  var ultima = Math.max.apply(null, [iN, iT].concat(pares.map(function (pq) { return pq[0] + 1; })));
+  rows.slice(hi + 1).forEach(function (r) {
+    var cru = String(r[iN] == null ? '' : r[iN]);
+    var nome = tc_(cru.replace(/^[^A-Za-zÀ-ú]+/, ''));
+    var turma = iT >= 0 ? String(r[iT]).trim().toUpperCase() : '';
+    if (!turma && nome.split(' ').length >= 2) turma = String(sn).trim().toUpperCase();
+    if (!nome || !turma || /^\d+$/.test(nome)) return;
+    var cont = [], vistosTel = {};
+    var add = function (c) { var k = c.q + '|' + c.nome + '|' + c.tel; if (vistosTel[k]) return; vistosTel[k] = 1; cont.push(c); };
+    var obs = [];
+    for (var j = ultima + 1; j < r.length; j++) { if (!usadas[j] && String(r[j]).trim()) obs.push(String(r[j]).replace(/\s+/g, ' ').trim()); }
+    // A observação vem primeiro: quando existe, é o contato que a escola indicou (ex.: alojamento do clube).
+    obs.forEach(function (o) { contatosObs_(o).forEach(add); });
+    pares.forEach(function (pq) {
+      var x = tirarTels_(r[pq[0]]), ps = pessoa_(x.resto, pq[1]);
+      x.tels.concat(normTels_(r[pq[0] + 1])).forEach(function (t) { add({ q: ps.q, nome: ps.nome, tel: t.tel, wa: t.wa }); });
+    });
+    var id = mkId_(cru.trim() ? tc_(cru) : nome); if (vistos[id]) id += '-' + mkId_(turma); vistos[id] = 1;
+    var c0 = cont.filter(function (c) { return c.nome; })[0];
+    out.push({ id: id, nome: nome, turma: turma, resp: c0 ? c0.q + ': ' + c0.nome : '', cont: cont, obs: obs.join(' · ') });
+  });
+  return out;
+}
 function sincronizarReferencia_() {
   var ss = SpreadsheetApp.openById(PLANILHA_REFERENCIA);
   var novos = [], vistos = {};
   ss.getSheets().forEach(function (sh) {
-    var sn = sh.getName();
     var rows = sh.getDataRange().getValues().map(function (r) { return r.map(function (c) { return typeof c === 'number' ? String(Math.round(c)) : String(c == null ? '' : c); }); });
-    var hi = -1;
-    for (var k = 0; k < rows.length && k < 15; k++) { if (rows[k].some(function (c) { return /^(aluno|estudante|nome)/.test(norm_(c)); })) { hi = k; break; } }
-    if (hi < 0) return;
-    var h = rows[hi].map(norm_);
-    var iN = -1, iT = -1, pares = [];
-    h.forEach(function (x, i) {
-      if (iN < 0 && /^(aluno|estudante|nome)/.test(x)) iN = i;
-      if (iT < 0 && /turma|classe/.test(x)) iT = i;
-      var m = x.match(/^(mae|pai|respons)/); if (m) pares.push([i, { mae: 'Mãe', pai: 'Pai', respons: 'Responsável' }[m[1]]]);
-    });
-    rows.slice(hi + 1).forEach(function (r) {
-      var nome = tc_(r[iN]);
-      var turma = iT >= 0 ? String(r[iT]).trim().toUpperCase() : '';
-      if (!turma && nome.split(' ').length >= 2) turma = String(sn).trim().toUpperCase();
-      if (!nome || !turma || /^\d+$/.test(nome)) return;
-      var cont = [];
-      pares.forEach(function (pq) {
-        var pn = r[pq[0]] && r[pq[0]] !== '0' ? tc_(r[pq[0]]) : ''; if (pn === '-') pn = '';
-        normTels_(r[pq[0] + 1]).forEach(function (t) { cont.push({ q: pq[1], nome: pn, tel: t.tel, wa: t.wa }); });
-      });
-      var id = mkId_(nome); if (vistos[id]) id += '-' + mkId_(turma); vistos[id] = 1;
-      var c0 = cont.filter(function (c) { return c.nome; })[0];
-      novos.push({ id: id, nome: nome, turma: turma, resp: c0 ? c0.q + ': ' + c0.nome : '', cont: cont });
-    });
+    novos = novos.concat(lerAbaRef_(rows, sh.getName(), vistos));
   });
   if (!novos.length) throw new Error('A planilha de referência não tem estudantes legíveis.');
   novos.sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt'); });
@@ -233,9 +278,10 @@ function sincronizarReferencia_() {
   try {
     var sh2 = aba_('Contatos');
     var trat = {}; lerAlunos_().forEach(function (a) { if (a.g) trat[a.id] = a.g; });
-    if (sh2.getLastRow() > 1) sh2.getRange(2, 1, sh2.getLastRow() - 1, 6).clearContent();
+    if (!sh2.getRange(1, 7).getValue()) sh2.getRange(1, 7).setValue('observacao').setFontWeight('bold');
+    if (sh2.getLastRow() > 1) sh2.getRange(2, 1, sh2.getLastRow() - 1, 7).clearContent();
     var linhas = novos.map(function (a) { return linhaAluno_(a, trat[a.id] || ''); });
-    sh2.getRange(2, 1, linhas.length, 6).setValues(linhas);
+    sh2.getRange(2, 1, linhas.length, 7).setValues(linhas);
   } finally { lock.releaseLock(); }
   var p = PropertiesService.getScriptProperties();
   p.setProperty('REF_ULTIMA', String(Date.now())); p.setProperty('REF_TOTAL', String(novos.length));
